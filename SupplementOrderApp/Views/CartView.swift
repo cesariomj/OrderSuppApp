@@ -8,7 +8,7 @@ struct CartView: View {
     let supplementIcon: (String) -> String
     
     private var totalPrice: Double {
-        cart.reduce(0) { $0 + ($1.supplement.price * Double($1.quantity)) }
+        cart.reduce(0) { $0 + ($1.selectedStoreInfo.price ?? 0 * Double($1.quantity)) }
     }
     
     var body: some View {
@@ -20,12 +20,17 @@ struct CartView: View {
                             Image(systemName: supplementIcon(item.supplement.name))
                                 .foregroundColor(.green)
                                 .frame(width: 30)
-                            Text(item.supplement.name)
-                                .font(.headline)
+                            VStack(alignment: .leading) {
+                                Text(item.supplement.name)
+                                    .font(.headline)
+                                Text(item.selectedStoreInfo.name)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
                             Spacer()
                             Text("x\(item.quantity)")
                                 .foregroundColor(.gray)
-                            Text("$\(item.supplement.price * Double(item.quantity), specifier: "%.2f")")
+                            Text("$\(item.selectedStoreInfo.price ?? 0 * Double(item.quantity), specifier: "%.2f")")
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
                         }

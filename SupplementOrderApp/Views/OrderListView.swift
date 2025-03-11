@@ -11,7 +11,7 @@ struct OrderListView: View {
             VStack {
                 List {
                     ForEach($orderList) { $item in
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Image(systemName: supplementIcon(item.supplement.name))
                                     .foregroundColor(.purple)
@@ -38,22 +38,29 @@ struct OrderListView: View {
                                         .foregroundColor(.green)
                                 }
                             }
-                            Text("Dosage: \(item.supplement.dosage)")
+                            Text("Store: \(item.selectedStoreInfo.name)")
                                 .font(.caption)
-                            Text("Type: \(item.supplement.type)")
-                                .font(.caption)
-                            if let url = URL(string: item.supplement.storeURL) {
-                                Text("Store")
+                                .foregroundColor(.gray)
+                            if let price = item.selectedStoreInfo.price {
+                                Text("Price: $\(price, specifier: "%.2f")")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                            if let url = URL(string: item.selectedStoreInfo.storeURL) {
+                                Text("Visit Store")
                                     .font(.caption)
                                     .foregroundColor(.blue)
                                     .onTapGesture {
-                                        print("Opening Store in OrderList: \(item.supplement.storeURL)")
                                         UIApplication.shared.open(url)
                                     }
-                            } else {
-                                Text("Store (Invalid URL)")
+                            }
+                            if let url = URL(string: item.selectedStoreInfo.infoURL) {
+                                Text("Visit Info")
                                     .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.blue)
+                                    .onTapGesture {
+                                        UIApplication.shared.open(url)
+                                    }
                             }
                         }
                         .padding(8)
@@ -68,7 +75,7 @@ struct OrderListView: View {
                 }
                 HStack(spacing: 15) {
                     Button("Copy List") {
-                        let listText = orderList.map { "\($0.supplement.name) x\($0.quantity)" }.joined(separator: ", ")
+                        let listText = orderList.map { "\($0.supplement.name) (\($0.selectedStoreInfo.name)) x\($0.quantity)" }.joined(separator: ", ")
                         UIPasteboard.general.string = listText.isEmpty ? "Order list is empty" : listText
                     }
                     .font(.subheadline)
