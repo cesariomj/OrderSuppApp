@@ -1,14 +1,21 @@
 import SwiftUI
+import CoreData
 
 struct CartView: View {
-    @Binding var cart: [CartItem]
+    @Environment(\.managedObjectContext) private var viewContext
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \CartItem.supplement?.name, ascending: true)],
+        predicate: NSPredicate(format: "order == nil"),
+        animation: .default)
+    private var cart: FetchedResults<CartItem>
+    
     let saveCart: () -> Void
     let addToOrderList: ([CartItem]) -> Void
     @Binding var showCart: Bool
     let supplementIcon: (String) -> String
     
     private var totalPrice: Double {
-        cart.reduce(0) { $0 + ($1.selectedStoreInfo.price ?? 0 * Double($1.quantity)) }
+        cart.reduce(0) { $0 + ($1.selectedStoreInfo?.price ?? 0 * Double($1.quantity)) }
     }
     
     var body: some View {
@@ -17,20 +24,20 @@ struct CartView: View {
                 List {
                     ForEach(cart) { item in
                         HStack {
-                            Image(systemName: supplementIcon(item.supplement.name))
+                            Image(systemName: supplementIcon(item.supplement?.name ?? ""))
                                 .foregroundColor(.green)
                                 .frame(width: 30)
                             VStack(alignment: .leading) {
-                                Text(item.supplement.name)
+                                Text(item.supplement?.name ?? "Unknown")
                                     .font(.headline)
-                                Text(item.selectedStoreInfo.name)
+                                Text(item.selectedStoreInfo?.name ?? "Unknown")
                                     .font(.caption)
                                     .foregroundColor(.gray)
                             }
                             Spacer()
                             Text("x\(item.quantity)")
                                 .foregroundColor(.gray)
-                            Text("$\(item.selectedStoreInfo.price ?? 0 * Double(item.quantity), specifier: "%.2f")")
+                            Text("$\(item.selectedStoreInfo?.price ?? 0 * Double(item.quantity), specifier: "%.2f")")
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
                         }
@@ -39,10 +46,7 @@ struct CartView: View {
                         .cornerRadius(10)
                         .shadow(color: .gray.opacity(0.2), radius: 2)
                     }
-                    .onDelete(perform: { indexSet in
-                        cart.remove(atOffsets: indexSet)
-                        saveCart()
-                    })
+                    .onDelete(perform: deleteItems)
                 }
                 Text("Total: $\(totalPrice, specifier: "%.2f")")
                     .font(.headline)
@@ -50,7 +54,7 @@ struct CartView: View {
                     .padding(.top)
                 HStack(spacing: 15) {
                     Button("Clear Cart") {
-                        cart.removeAll()
+                        cart.forEach { viewContext.delete($0) }
                         saveCart()
                     }
                     .font(.subheadline)
@@ -61,9 +65,7 @@ struct CartView: View {
                     .cornerRadius(10)
                     .shadow(radius: 2)
                     Button("Add to Order List") {
-                        addToOrderList(cart)
-                        cart.removeAll()
-                        saveCart()
+                        addToOrderList(Array(cart))
                     }
                     .font(.subheadline)
                     .padding(.horizontal, 12)
@@ -79,4 +81,18 @@ struct CartView: View {
             .navigationTitle("Cart")
         }
     }
+    
+    private func deleteItems(at offsets: IndexSet) {
+        offsets.map { cart[$0] }.forEach(viewContext.delete)
+        saveCart()
+    }
+}
+
+#Preview {
+    CartView(
+        saveCart: {},
+        addToOrderList: { _ in },
+        showCart: .constant(true),
+        supplementIcon: { _ in "pill.fill" }
+    ).environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
 }

@@ -1,9 +1,20 @@
 import SwiftUI
 import SwiftSoup
+import CoreData
 
 struct EditSupplementsView: View {
-    @Binding var supplements: [Supplement]
-    @Binding var cart: [CartItem]
+    @Environment(\.managedObjectContext) private var viewContext
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Supplement.name, ascending: true)],
+        animation: .default)
+    private var supplements: FetchedResults<Supplement>
+    
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \CartItem.supplement?.name, ascending: true)],
+        predicate: NSPredicate(format: "order == nil"),
+        animation: .default)
+    private var cart: FetchedResults<CartItem>
+    
     @State private var editingSupplementIndex: Int?
     @State private var addingSupplement = false
     @State private var selectedStores: [UUID: UUID] = [:]
@@ -12,30 +23,14 @@ struct EditSupplementsView: View {
     
     var body: some View {
         NavigationStack {
-            List($supplements) { $supplement in
-                SupplementRow(
-                    supplement: $supplement,
-                    selectedStoreId: $selectedStores[supplement.id],
-                    cart: cart,
-                    addToCart: {
-                        if let selectedStoreId = selectedStores[supplement.id],
-                           let storeInfo = supplement.storeInfos.first(where: { $0.id == selectedStoreId }) {
-                            print("Adding \(supplement.name) from \(storeInfo.name) to cart")
-                            if let index = cart.firstIndex(where: { $0.supplement.id == supplement.id && $0.selectedStoreInfo.id == storeInfo.id }) {
-                                cart[index].quantity += 1
-                            } else {
-                                cart.append(CartItem(supplement: supplement, selectedStoreInfo: storeInfo, quantity: 1))
-                            }
-                            saveCart()
-                        } else {
-                            print("No store selected for \(supplement.name)")
-                        }
-                    },
+            List(supplements.indices, id: \.self) { index in
+                SupplementRowView(
+                    supplement: supplements[index],
+                    selectedStoreId: $selectedStores[supplements[index].id ?? UUID()],
+                    cart: Array(cart),
+                    addToCart: addToCart(index: index),
                     editAction: {
-                        if let index = supplements.firstIndex(where: { $0.id == supplement.id }) {
-                            print("Setting editingSupplementIndex to: \(index) for \(supplement.name)")
-                            editingSupplementIndex = index
-                        }
+                        editingSupplementIndex = index
                     }
                 )
             }
@@ -93,7 +88,11 @@ struct EditSupplementsView: View {
                     SupplementEditView(
                         supplement: supplements[index],
                         onSave: { updatedSupplement in
-                            supplements[index] = updatedSupplement
+                            supplements[index].name = updatedSupplement.name
+                            supplements[index].price = updatedSupplement.price
+                            supplements[index].dosage = updatedSupplement.dosage
+                            supplements[index].quantity = updatedSupplement.quantity
+                            supplements[index].type = updatedSupplement.type
                             saveSupplements()
                             editingSupplementIndex = nil
                         }
@@ -101,17 +100,35 @@ struct EditSupplementsView: View {
                 }
             }
             .sheet(isPresented: $addingSupplement) {
-                AddSupplementView(supplements: $supplements)
+                AddSupplementView(supplements: .constant([]))
             }
             .onAppear {
                 for supplement in supplements {
-                    if selectedStores[supplement.id] == nil, let firstStoreId = supplement.storeInfos.first?.id {
-                        selectedStores[supplement.id] = firstStoreId
+                    if selectedStores[supplement.id ?? UUID()] == nil,
+                       let firstStore = supplement.storeInfos?.anyObject() as? StoreInfo {
+                        selectedStores[supplement.id ?? UUID()] = firstStore.id
                     }
                 }
             }
-            .onChange(of: supplements) {
-                saveSupplements()
+        }
+    }
+    
+    private func addToCart(index: Int) -> () -> Void {
+        return {
+            let supplement = supplements[index]
+            if let selectedStoreId = selectedStores[supplement.id ?? UUID()],
+               let storeInfos = supplement.storeInfos as? Set<StoreInfo>,
+               let storeInfo = storeInfos.first(where: { $0.id == selectedStoreId }) {
+                if let existingItem = cart.first(where: { $0.supplement?.id == supplement.id && $0.selectedStoreInfo?.id == storeInfo.id }) {
+                    existingItem.quantity += 1
+                } else {
+                    let newItem = CartItem(context: viewContext)
+                    newItem.id = UUID()
+                    newItem.supplement = supplement
+                    newItem.selectedStoreInfo = storeInfo
+                    newItem.quantity = 1
+                }
+                saveCart()
             }
         }
     }
@@ -128,16 +145,18 @@ struct EditSupplementsView: View {
     
     @MainActor
     private func refreshPrices() async throws {
-        for index in supplements.indices {
-            for storeIndex in supplements[index].storeInfos.indices {
-                if let url = URL(string: supplements[index].storeInfos[storeIndex].storeURL) {
-                    do {
-                        let price = try await scrapePrice(from: url)
-                        supplements[index].storeInfos[storeIndex].price = price
-                    } catch {
-                        print("Failed to scrape \(url): \(error)")
-                        supplements[index].storeInfos[storeIndex].price = nil
-                        throw error
+        for supplement in supplements {
+            if let storeInfos = supplement.storeInfos as? Set<StoreInfo> {
+                for storeInfo in storeInfos {
+                    if let url = URL(string: storeInfo.storeURL ?? "") {
+                        do {
+                            let price = try await scrapePrice(from: url)
+                            storeInfo.price = price
+                        } catch {
+                            print("Failed to scrape \(url): \(error)")
+                            storeInfo.price = 0.0
+                            throw error
+                        }
                     }
                 }
             }
@@ -202,21 +221,25 @@ struct EditSupplementsView: View {
         throw URLError(.resourceUnavailable)
     }
     
-    func saveCart() {
-        if let encoded = try? JSONEncoder().encode(cart) {
-            UserDefaults.standard.set(encoded, forKey: "cart")
+    private func saveCart() {
+        do {
+            try viewContext.save()
+        } catch {
+            print("Failed to save cart: \(error)")
         }
     }
     
-    func saveSupplements() {
-        if let encoded = try? JSONEncoder().encode(supplements) {
-            UserDefaults.standard.set(encoded, forKey: "supplements")
+    private func saveSupplements() {
+        do {
+            try viewContext.save()
+        } catch {
+            print("Failed to save supplements: \(error)")
         }
     }
 }
 
-struct SupplementRow: View {
-    @Binding var supplement: Supplement
+struct SupplementRowView: View {
+    @ObservedObject var supplement: Supplement
     @Binding var selectedStoreId: UUID?
     let cart: [CartItem]
     let addToCart: () -> Void
@@ -224,25 +247,26 @@ struct SupplementRow: View {
     
     private var cartQuantity: Int {
         if let selectedStoreId = selectedStoreId,
-           let cartItem = cart.first(where: { $0.supplement.id == supplement.id && $0.selectedStoreInfo.id == selectedStoreId }) {
-            return cartItem.quantity
+           let cartItem = cart.first(where: { $0.supplement?.id == supplement.id && $0.selectedStoreInfo?.id == selectedStoreId }) {
+            return Int(cartItem.quantity)
         }
         return 0
     }
     
     private var cheapestStoreId: UUID? {
-        let validStores = supplement.storeInfos.filter { $0.price != nil }
-        guard let cheapest = validStores.min(by: { $0.price! < $1.price! }) else { return nil }
-        return cheapest.id
+        guard let storeInfos = supplement.storeInfos as? Set<StoreInfo>,
+              !storeInfos.isEmpty else { return nil }
+        let validStores = storeInfos.filter { $0.price != 0.0 }
+        return validStores.min(by: { $0.price < $1.price })?.id
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: supplementIcon(for: supplement.name))
+                Image(systemName: supplementIcon(for: supplement.name ?? ""))
                     .foregroundColor(.blue)
                     .frame(width: 30)
-                Text(supplement.name)
+                Text(supplement.name ?? "Unknown")
                     .font(.headline)
                     .contentShape(Rectangle())
                     .onTapGesture(perform: editAction)
@@ -268,58 +292,67 @@ struct SupplementRow: View {
                     }
                 }
             }
-            Text("Dosage: \(supplement.dosage)")
+            Text("Dosage: \(supplement.dosage ?? "N/A")")
                 .font(.caption)
-            Text("Quantity: \(supplement.quantity) \(supplement.type.lowercased())s")
+            Text("Quantity: \(supplement.quantity) \(supplement.type?.lowercased() ?? "")s")
                 .font(.caption)
-            Section(header: Text("Store Options").font(.caption.bold())) {
-                ForEach(supplement.storeInfos) { storeInfo in
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack {
-                            Image(systemName: selectedStoreId == storeInfo.id ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(.blue)
-                            Text("\(storeInfo.name):")
-                                .font(.caption)
-                            Text(storeInfo.price != nil ? "$\(storeInfo.price!, specifier: "%.2f")" : "N/A")
-                                .font(.caption)
-                                .foregroundColor(storeInfo.id == cheapestStoreId ? .green : (storeInfo.price != nil ? .blue : .gray))
-                            Spacer()
-                            if let url = URL(string: storeInfo.storeURL) {
-                                Text("Visit Store")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                                    .onTapGesture {
-                                        UIApplication.shared.open(url)
-                                    }
-                            }
-                        }
-                        if let url = URL(string: storeInfo.infoURL) {
-                            HStack {
-                                Text("Info")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                                    .onTapGesture {
-                                        UIApplication.shared.open(url)
-                                    }
-                                Spacer()
-                            }
-                            .padding(.leading, 20)
-                        }
-                    }
-                    .padding(4)
-                    .background(selectedStoreId == storeInfo.id ? Color.blue.opacity(0.1) : Color.clear)
-                    .cornerRadius(6)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedStoreId = storeInfo.id
+            Section {
+                if let storeInfos = supplement.storeInfos as? Set<StoreInfo> {
+                    let sortedStores = storeInfos.sorted { $0.name ?? "" < $1.name ?? "" }
+                    ForEach(sortedStores, id: \.id) { storeInfo in
+                        storeOptionRow(storeInfo: storeInfo)
                     }
                 }
+            } header: {
+                Text("Store Options").font(.caption.bold())
             }
         }
         .padding(10)
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: .gray.opacity(0.2), radius: 4, x: 0, y: 2)
+    }
+    
+    private func storeOptionRow(storeInfo: StoreInfo) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Image(systemName: selectedStoreId == storeInfo.id ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(.blue)
+                Text("\(storeInfo.name ?? "Unknown"):")
+                    .font(.caption)
+                Text(storeInfo.price != 0.0 ? "$\(storeInfo.price, specifier: "%.2f")" : "N/A")
+                    .font(.caption)
+                    .foregroundColor(storeInfo.id == cheapestStoreId ? .green : (storeInfo.price != 0.0 ? .blue : .gray))
+                Spacer()
+                if let url = URL(string: storeInfo.storeURL ?? "") {
+                    Text("Visit Store")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .onTapGesture {
+                            UIApplication.shared.open(url)
+                        }
+                }
+            }
+            if let url = URL(string: storeInfo.infoURL ?? "") {
+                HStack {
+                    Text("Info")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .onTapGesture {
+                            UIApplication.shared.open(url)
+                        }
+                    Spacer()
+                }
+                .padding(.leading, 20)
+            }
+        }
+        .padding(4)
+        .background(selectedStoreId == storeInfo.id ? Color.blue.opacity(0.1) : Color.clear)
+        .cornerRadius(6)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedStoreId = storeInfo.id
+        }
     }
     
     private func supplementIcon(for name: String) -> String {
