@@ -21,31 +21,77 @@ struct ContentView: View {
         animation: .default)
     private var supplements: FetchedResults<Supplement>
 
+    @State private var selectedTab = "Home" // Track the selected menu item
+
     var body: some View {
-        TabView {
-            HomeView()
-                .tabItem { Label("Home", systemImage: "house") }
-            EditSupplementsView()
-                .tabItem { Label("Edit", systemImage: "pencil") }
-            CartView(
-                saveCart: saveCart,
-                addToOrderList: addToOrderList,
-                showCart: .constant(true),
-                supplementIcon: supplementIcon
-            )
-                .tabItem { Label("Cart", systemImage: "cart") }
-            OrderListView(
-                saveOrderList: saveCart,
-                showOrderList: .constant(true),
-                supplementIcon: supplementIcon
-            )
-                .tabItem { Label("Order List", systemImage: "list.bullet") }
+        ZStack {
+            // Background
+            VStack(spacing: 0) {
+                Color.blue.opacity(0.1) // Solid light blue for the top inch
+                    .frame(height: 100) // Roughly an inch, adjust if needed
+                LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.white]), startPoint: .top, endPoint: .bottom)
+            }
+            .ignoresSafeArea()
+
+            // Content based on selected tab
+            VStack {
+                // Custom Oval Menu at the Top
+                HStack(spacing: 20) {
+                    Text("Home")
+                        .font(.system(size: 34)) // Doubled from ~17 to 34
+                        .padding(8)
+                        .background(selectedTab == "Home" ? Color.white : Color.clear)
+                        .cornerRadius(8)
+                        .onTapGesture { selectedTab = "Home" }
+                    Text("Edit")
+                        .font(.system(size: 34))
+                        .padding(8)
+                        .background(selectedTab == "Edit" ? Color.white : Color.clear)
+                        .cornerRadius(8)
+                        .onTapGesture { selectedTab = "Edit" }
+                    Text("Cart")
+                        .font(.system(size: 34))
+                        .padding(8)
+                        .background(selectedTab == "Cart" ? Color.white : Color.clear)
+                        .cornerRadius(8)
+                        .onTapGesture { selectedTab = "Cart" }
+                    Text("Order List")
+                        .font(.system(size: 34))
+                        .padding(8)
+                        .background(selectedTab == "Order List" ? Color.white : Color.clear)
+                        .cornerRadius(8)
+                        .onTapGesture { selectedTab = "Order List" }
+                }
+                .padding()
+                .background(Color.blue.opacity(0.1)) // Matches the top background
+                .clipShape(Capsule()) // Oval shape
+                .padding(.horizontal)
+
+                // Content Area
+                switch selectedTab {
+                case "Home":
+                    HomeView()
+                case "Edit":
+                    EditSupplementsView()
+                case "Cart":
+                    CartView(
+                        saveCart: saveCart,
+                        addToOrderList: addToOrderList,
+                        showCart: .constant(true),
+                        supplementIcon: supplementIcon
+                    )
+                case "Order List":
+                    OrderListView(
+                        saveOrderList: saveCart,
+                        showOrderList: .constant(true),
+                        supplementIcon: supplementIcon
+                    )
+                default:
+                    HomeView() // Fallback
+                }
+            }
         }
         .accentColor(.blue)
-        .background(
-            LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.white]), startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        )
         .onAppear(perform: loadInitialData)
     }
     
@@ -130,15 +176,15 @@ struct HomeView: View {
                 Image(systemName: "pills.fill")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 200, height: 200)
+                    .frame(width: 400, height: 400) // Doubled from 200 to 400
                     .foregroundColor(.blue)
                     .shadow(radius: 5)
                 Text("Supplement Order")
-                    .font(.largeTitle.bold())
+                    .font(.system(size: 68, weight: .bold)) // Doubled from ~34 to 68
                     .foregroundColor(.blue)
                     .padding(.top, 20)
                 Text("Manage your supplements with ease!")
-                    .font(.subheadline)
+                    .font(.system(size: 30)) // Doubled from ~15 to 30
                     .foregroundColor(.gray)
             }
         }

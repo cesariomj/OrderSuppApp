@@ -17,6 +17,7 @@ struct EditSupplementsView: View {
     
     @State private var editingSupplementIndex: Int?
     @State private var addingSupplement = false
+    @State private var editingStoresForSupplement: Supplement? // Track which supplement’s stores to edit
     @State private var selectedStores: [UUID: UUID] = [:]
     @State private var isRefreshingPrices = false
     @State private var refreshError: String?
@@ -58,7 +59,22 @@ struct EditSupplementsView: View {
                     .foregroundColor(.blue)
                     .disabled(isRefreshingPrices)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Menu {
+                        Button("Edit Stores") {
+                            if !supplements.isEmpty {
+                                editingStoresForSupplement = supplements.first
+                            }
+                        }
+                        Button("Edit Supplement") {
+                            if !supplements.isEmpty {
+                                editingSupplementIndex = 0 // Edit the first supplement as a default
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "pencil")
+                            .foregroundColor(.blue)
+                    }
                     Button(action: {
                         addingSupplement = true
                     }) {
@@ -100,7 +116,15 @@ struct EditSupplementsView: View {
                 }
             }
             .sheet(isPresented: $addingSupplement) {
-                AddSupplementView(supplements: .constant([]))
+                AddSupplementView(supplements: .constant([])) // Placeholder until actual code is shared
+            }
+            .sheet(isPresented: Binding(
+                get: { editingStoresForSupplement != nil },
+                set: { if !$0 { editingStoresForSupplement = nil } }
+            )) {
+                if let supplement = editingStoresForSupplement {
+                    StoreEditView(supplement: supplement)
+                }
             }
             .onAppear {
                 for supplement in supplements {
