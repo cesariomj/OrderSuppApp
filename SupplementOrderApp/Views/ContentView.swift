@@ -21,24 +21,21 @@ struct ContentView: View {
         animation: .default)
     private var supplements: FetchedResults<Supplement>
 
-    @State private var selectedTab = "Home" // Track the selected menu item
+    @State private var selectedTab = "Home"
 
     var body: some View {
         ZStack {
-            // Background
             VStack(spacing: 0) {
-                Color.blue.opacity(0.1) // Solid light blue for the top inch
-                    .frame(height: 100) // Roughly an inch, adjust if needed
+                Color.blue.opacity(0.1)
+                    .frame(height: 100)
                 LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.white]), startPoint: .top, endPoint: .bottom)
             }
             .ignoresSafeArea()
 
-            // Content based on selected tab
             VStack {
-                // Custom Oval Menu at the Top
                 HStack(spacing: 20) {
                     Text("Home")
-                        .font(.system(size: 34)) // Doubled from ~17 to 34
+                        .font(.system(size: 34))
                         .padding(8)
                         .background(selectedTab == "Home" ? Color.white : Color.clear)
                         .cornerRadius(8)
@@ -63,11 +60,10 @@ struct ContentView: View {
                         .onTapGesture { selectedTab = "Order List" }
                 }
                 .padding()
-                .background(Color.blue.opacity(0.1)) // Matches the top background
-                .clipShape(Capsule()) // Oval shape
+                .background(Color.blue.opacity(0.1))
+                .clipShape(Capsule())
                 .padding(.horizontal)
 
-                // Content Area
                 switch selectedTab {
                 case "Home":
                     HomeView()
@@ -87,12 +83,15 @@ struct ContentView: View {
                         supplementIcon: supplementIcon
                     )
                 default:
-                    HomeView() // Fallback
+                    HomeView()
                 }
             }
         }
         .accentColor(.blue)
-        .onAppear(perform: loadInitialData)
+        .onAppear {
+            loadInitialData()
+            print("ContentView appeared, supplements count: \(supplements.count)")
+        }
     }
     
     private func supplementIcon(for name: String) -> String {
@@ -124,6 +123,7 @@ struct ContentView: View {
     
     private func loadInitialData() {
         if supplements.isEmpty {
+            print("Loading initial data, supplements was empty")
             let initialSupplements: [(String, Double, String, Int32, String, [(String, String, String, Double?)])] = [
                 ("Protein Powder", 29.99, "1 scoop daily", 30, "Powder", [
                     ("Amazon", "https://www.amazon.com/Optimum-Nutrition-Standard-Protein-Chocolate/dp/B000QSNYGI", "https://www.amazon.com/Optimum-Nutrition-Standard-Protein-Chocolate/dp/B000QSNYGI#customerReviews", 29.99),
@@ -163,6 +163,9 @@ struct ContentView: View {
                 }
             }
             try? viewContext.save()
+            print("Initial data loaded, supplements count: \(supplements.count)")
+        } else {
+            print("Initial data skipped, supplements count: \(supplements.count)")
         }
     }
 }
@@ -176,15 +179,15 @@ struct HomeView: View {
                 Image(systemName: "pills.fill")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 400, height: 400) // Doubled from 200 to 400
+                    .frame(width: 400, height: 400)
                     .foregroundColor(.blue)
                     .shadow(radius: 5)
                 Text("Supplement Order")
-                    .font(.system(size: 68, weight: .bold)) // Doubled from ~34 to 68
+                    .font(.system(size: 68, weight: .bold))
                     .foregroundColor(.blue)
                     .padding(.top, 20)
                 Text("Manage your supplements with ease!")
-                    .font(.system(size: 30)) // Doubled from ~15 to 30
+                    .font(.system(size: 30))
                     .foregroundColor(.gray)
             }
         }
@@ -192,5 +195,5 @@ struct HomeView: View {
 }
 
 #Preview {
-    ContentView().environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+    ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }

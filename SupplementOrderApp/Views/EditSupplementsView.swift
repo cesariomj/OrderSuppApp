@@ -4,8 +4,10 @@ import CoreData
 
 struct EditSupplementsView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Supplement.name, ascending: true)],
+        predicate: NSPredicate(format: "name != nil AND name != ''"),
         animation: .default)
     private var supplements: FetchedResults<Supplement>
     
@@ -17,23 +19,25 @@ struct EditSupplementsView: View {
     
     @State private var editingSupplementIndex: Int?
     @State private var addingSupplement = false
-    @State private var editingStoresForSupplement: Supplement? // Track which supplement’s stores to edit
     @State private var selectedStores: [UUID: UUID] = [:]
     @State private var isRefreshingPrices = false
     @State private var refreshError: String?
     
     var body: some View {
         NavigationStack {
-            List(supplements.indices, id: \.self) { index in
-                SupplementRowView(
-                    supplement: supplements[index],
-                    selectedStoreId: $selectedStores[supplements[index].id ?? UUID()],
-                    cart: Array(cart),
-                    addToCart: addToCart(index: index),
-                    editAction: {
-                        editingSupplementIndex = index
-                    }
-                )
+            List {
+                ForEach(supplements.indices, id: \.self) { index in
+                    SupplementRowView(
+                        supplement: supplements[index],
+                        selectedStoreId: $selectedStores[supplements[index].id ?? UUID()],
+                        cart: Array(cart),
+                        addToCart: addToCart(index: index),
+                        editAction: {
+                            editingSupplementIndex = index
+                        }
+                    )
+                }
+                .onDelete(perform: deleteSupplements)
             }
             .navigationTitle("Edit Supplements")
             .toolbar {
@@ -59,23 +63,9 @@ struct EditSupplementsView: View {
                     .foregroundColor(.blue)
                     .disabled(isRefreshingPrices)
                 }
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Edit Stores") {
-                            if !supplements.isEmpty {
-                                editingStoresForSupplement = supplements.first
-                            }
-                        }
-                        Button("Edit Supplement") {
-                            if !supplements.isEmpty {
-                                editingSupplementIndex = 0 // Edit the first supplement as a default
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "pencil")
-                            .foregroundColor(.blue)
-                    }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {
+                        print("Tapped +, supplements count before: \(supplements.count)")
                         addingSupplement = true
                     }) {
                         Image(systemName: "plus")
@@ -94,39 +84,23 @@ struct EditSupplementsView: View {
                         .onTapGesture {
                             refreshError = nil
                         }
+                    }
                 }
+            .sheet(isPresented: $addingSupplement, onDismiss: {
+                print("Sheet dismissed, supplements count after: \(supplements.count)")
+            }) {
+                EditSupplementView()
             }
             .sheet(isPresented: Binding(
                 get: { editingSupplementIndex != nil },
                 set: { if !$0 { editingSupplementIndex = nil } }
             )) {
                 if let index = editingSupplementIndex {
-                    SupplementEditView(
-                        supplement: supplements[index],
-                        onSave: { updatedSupplement in
-                            supplements[index].name = updatedSupplement.name
-                            supplements[index].price = updatedSupplement.price
-                            supplements[index].dosage = updatedSupplement.dosage
-                            supplements[index].quantity = updatedSupplement.quantity
-                            supplements[index].type = updatedSupplement.type
-                            saveSupplements()
-                            editingSupplementIndex = nil
-                        }
-                    )
-                }
-            }
-            .sheet(isPresented: $addingSupplement) {
-                AddSupplementView(supplements: .constant([])) // Placeholder until actual code is shared
-            }
-            .sheet(isPresented: Binding(
-                get: { editingStoresForSupplement != nil },
-                set: { if !$0 { editingStoresForSupplement = nil } }
-            )) {
-                if let supplement = editingStoresForSupplement {
-                    StoreEditView(supplement: supplement)
+                    EditSupplementView(supplement: supplements[index])
                 }
             }
             .onAppear {
+                print("EditSupplementsView appeared, supplements count: \(supplements.count)")
                 for supplement in supplements {
                     if selectedStores[supplement.id ?? UUID()] == nil,
                        let firstStore = supplement.storeInfos?.anyObject() as? StoreInfo {
@@ -137,13 +111,24 @@ struct EditSupplementsView: View {
         }
     }
     
+    private func deleteSupplements(at offsets: IndexSet) {
+        offsets.forEach { index in
+            let supplement = supplements[index]
+            if let cartItems = supplement.cartItems as? Set<CartItem> {
+                cartItems.forEach { viewContext.delete($0) }
+            }
+            viewContext.delete(supplement)
+        }
+        saveSupplements()
+    }
+    
     private func addToCart(index: Int) -> () -> Void {
         return {
             let supplement = supplements[index]
             if let selectedStoreId = selectedStores[supplement.id ?? UUID()],
                let storeInfos = supplement.storeInfos as? Set<StoreInfo>,
                let storeInfo = storeInfos.first(where: { $0.id == selectedStoreId }) {
-                if let existingItem = cart.first(where: { $0.supplement?.id == supplement.id && $0.selectedStoreInfo?.id == storeInfo.id }) {
+                if let existingItem = cart.first(where: { $0.supplement?.id == supplement.id && $0.selectedStoreInfo?.id == selectedStoreId }) {
                     existingItem.quantity += 1
                 } else {
                     let newItem = CartItem(context: viewContext)
@@ -162,7 +147,7 @@ struct EditSupplementsView: View {
         case "Protein Powder": return "drop.fill"
         case "Vitamin D": return "sun.max.fill"
         case "Omega-3 Fish Oil": return "fish.fill"
-        case "Multivitamin": return "pills.fill"
+        case "Supplement": return "pills.fill"
         default: return "pill.fill"
         }
     }
@@ -268,6 +253,9 @@ struct SupplementRowView: View {
     let cart: [CartItem]
     let addToCart: () -> Void
     let editAction: () -> Void
+    @Environment(\.managedObjectContext) private var viewContext
+    
+    @State private var priceString: String = ""
     
     private var cartQuantity: Int {
         if let selectedStoreId = selectedStoreId,
@@ -320,6 +308,30 @@ struct SupplementRowView: View {
                 .font(.caption)
             Text("Quantity: \(supplement.quantity) \(supplement.type?.lowercased() ?? "")s")
                 .font(.caption)
+            HStack {
+                Text("Price:")
+                    .font(.caption)
+                TextField("Enter price", text: $priceString)
+                    .keyboardType(.decimalPad)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .frame(width: 100)
+                    .onChange(of: priceString) { oldValue, newValue in
+                        if let price = Double(newValue) {
+                            supplement.price = price
+                            saveContext()
+                        }
+                    }
+            }
+            // Added Categories display
+            if let categories = supplement.categories as? Set<String>, !categories.isEmpty {
+                Text("Categories: \(categories.sorted().joined(separator: ", "))")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            } else {
+                Text("Categories: None")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
             Section {
                 if let storeInfos = supplement.storeInfos as? Set<StoreInfo> {
                     let sortedStores = storeInfos.sorted { $0.name ?? "" < $1.name ?? "" }
@@ -335,6 +347,9 @@ struct SupplementRowView: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: .gray.opacity(0.2), radius: 4, x: 0, y: 2)
+        .onAppear {
+            priceString = supplement.price > 0 ? String(supplement.price) : ""
+        }
     }
     
     private func storeOptionRow(storeInfo: StoreInfo) -> some View {
@@ -384,8 +399,16 @@ struct SupplementRowView: View {
         case "Protein Powder": return "drop.fill"
         case "Vitamin D": return "sun.max.fill"
         case "Omega-3 Fish Oil": return "fish.fill"
-        case "Multivitamin": return "pills.fill"
+        case "Supplement": return "pills.fill"
         default: return "pill.fill"
+        }
+    }
+    
+    private func saveContext() {
+        do {
+            try viewContext.save()
+        } catch {
+            print("Failed to save price: \(error)")
         }
     }
 }

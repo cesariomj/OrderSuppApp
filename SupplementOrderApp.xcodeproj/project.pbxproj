@@ -8,11 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		6FDFC9B02D821A7400C38F92 /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 6FDFC9AF2D821A7400C38F92 /* SwiftSoup */; };
-		6FED98852D81DD7D00533076 /* SupplementOrderApp.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 6FED98832D81DD7D00533076 /* SupplementOrderApp.xcdatamodeld */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		6FED98842D81DD7D00533076 /* SupplementOrderApp.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = SupplementOrderApp.xcdatamodel; sourceTree = "<group>"; };
 		6FF1E31D2D7E470E00ED7890 /* SupplementOrderApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupplementOrderApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -39,7 +37,6 @@
 		6FF1E3142D7E470E00ED7890 = {
 			isa = PBXGroup;
 			children = (
-				6FED98832D81DD7D00533076 /* SupplementOrderApp.xcdatamodeld */,
 				6FF1E31F2D7E470E00ED7890 /* SupplementOrderApp */,
 				6FF1E31E2D7E470E00ED7890 /* Products */,
 			);
@@ -131,7 +128,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6FED98852D81DD7D00533076 /* SupplementOrderApp.xcdatamodeld in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -356,19 +352,6 @@
 			productName = SwiftSoup;
 		};
 /* End XCSwiftPackageProductDependency section */
-
-/* Begin XCVersionGroup section */
-		6FED98832D81DD7D00533076 /* SupplementOrderApp.xcdatamodeld */ = {
-			isa = XCVersionGroup;
-			children = (
-				6FED98842D81DD7D00533076 /* SupplementOrderApp.xcdatamodel */,
-			);
-			currentVersion = 6FED98842D81DD7D00533076 /* SupplementOrderApp.xcdatamodel */;
-			path = SupplementOrderApp.xcdatamodeld;
-			sourceTree = "<group>";
-			versionGroupType = wrapper.xcdatamodel;
-		};
-/* End XCVersionGroup section */
 	};
 	rootObject = 6FF1E3152D7E470E00ED7890 /* Project object */;
 }

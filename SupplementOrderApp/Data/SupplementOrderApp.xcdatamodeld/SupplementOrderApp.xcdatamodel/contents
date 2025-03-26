@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23605" systemVersion="24D70" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23605" systemVersion="24D81" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
     <entity name="CartItem" representedClassName="CartItem" syncable="YES" codeGenerationType="class">
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="quantity" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
@@ -22,6 +22,7 @@
         <relationship name="supplement" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Supplement" inverseName="storeInfos" inverseEntity="Supplement"/>
     </entity>
     <entity name="Supplement" representedClassName="Supplement" syncable="YES" codeGenerationType="class">
+        <attribute name="categories" optional="YES" attributeType="Transformable" valueTransformerName="StringSetTransformer" customClassName="NSSet"/>
         <attribute name="dosage" optional="YES" attributeType="String"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="name" optional="YES" attributeType="String"/>
@@ -29,6 +30,6 @@
         <attribute name="quantity" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="type" optional="YES" attributeType="String"/>
         <relationship name="cartItems" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CartItem" inverseName="supplement" inverseEntity="CartItem"/>
-        <relationship name="storeInfos" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="StoreInfo" inverseName="supplement" inverseEntity="StoreInfo"/>
+        <relationship name="storeInfos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="StoreInfo" inverseName="supplement" inverseEntity="StoreInfo"/>
     </entity>
 </model>
