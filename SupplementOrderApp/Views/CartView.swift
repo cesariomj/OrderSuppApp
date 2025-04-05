@@ -15,7 +15,7 @@ struct CartView: View {
     let supplementIcon: (String) -> String
     
     private var totalPrice: Double {
-        cart.reduce(0) { $0 + ($1.selectedStoreInfo?.price ?? 0 * Double($1.quantity)) }
+        cart.reduce(0) { $0 + (Double($1.quantity) * ($1.selectedStoreInfo?.price ?? 0)) }
     }
     
     var body: some View {
@@ -94,5 +94,5 @@ struct CartView: View {
         addToOrderList: { _ in },
         showCart: .constant(true),
         supplementIcon: { _ in "pill.fill" }
-    ).environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+    ).environment(\.managedObjectContext, PersistenceController.shared.container.viewContext) // Fixed reference
 }

@@ -1,6 +1,6 @@
 import SwiftUI
-import SwiftSoup
 import CoreData
+import SwiftSoup
 
 struct EditSupplementsView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -32,9 +32,7 @@ struct EditSupplementsView: View {
                         selectedStoreId: $selectedStores[supplements[index].id ?? UUID()],
                         cart: Array(cart),
                         addToCart: addToCart(index: index),
-                        editAction: {
-                            editingSupplementIndex = index
-                        }
+                        editAction: { editingSupplementIndex = index }
                     )
                 }
                 .onDelete(perform: deleteSupplements)
@@ -46,19 +44,13 @@ struct EditSupplementsView: View {
                         Task {
                             isRefreshingPrices = true
                             refreshError = nil
-                            do {
-                                try await refreshPrices()
-                            } catch {
-                                refreshError = "Failed to refresh prices: \(error.localizedDescription)"
-                            }
+                            do { try await refreshPrices() }
+                            catch { refreshError = "Failed to refresh prices: \(error.localizedDescription)" }
                             isRefreshingPrices = false
                         }
                     }) {
-                        if isRefreshingPrices {
-                            ProgressView()
-                        } else {
-                            Text("Refresh Prices")
-                        }
+                        if isRefreshingPrices { ProgressView() }
+                        else { Text("Refresh Prices") }
                     }
                     .foregroundColor(.blue)
                     .disabled(isRefreshingPrices)
@@ -81,16 +73,12 @@ struct EditSupplementsView: View {
                         .background(Color(.systemBackground))
                         .cornerRadius(8)
                         .shadow(radius: 4)
-                        .onTapGesture {
-                            refreshError = nil
-                        }
-                    }
+                        .onTapGesture { refreshError = nil }
                 }
+            }
             .sheet(isPresented: $addingSupplement, onDismiss: {
                 print("Sheet dismissed, supplements count after: \(supplements.count)")
-            }) {
-                EditSupplementView()
-            }
+            }) { EditSupplementView() }
             .sheet(isPresented: Binding(
                 get: { editingSupplementIndex != nil },
                 set: { if !$0 { editingSupplementIndex = nil } }
@@ -322,7 +310,6 @@ struct SupplementRowView: View {
                         }
                     }
             }
-            // Added Categories display
             if let categories = supplement.categories as? Set<String>, !categories.isEmpty {
                 Text("Categories: \(categories.sorted().joined(separator: ", "))")
                     .font(.caption)

@@ -7,6 +7,16 @@
         <relationship name="selectedStoreInfo" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="StoreInfo" inverseName="cardItems" inverseEntity="StoreInfo"/>
         <relationship name="supplement" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Supplement" inverseName="cartItems" inverseEntity="Supplement"/>
     </entity>
+    <entity name="Category" representedClassName="Category" syncable="YES" codeGenerationType="class">
+        <attribute name="name" attributeType="String"/>
+        <relationship name="supplements" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Supplement" inverseName="categories" inverseEntity="Supplement"/>
+    </entity>
+    <entity name="DosageFrequency" representedClassName="DosageFrequency" syncable="YES" codeGenerationType="class">
+        <attribute name="name" attributeType="String"/>
+    </entity>
+    <entity name="DosageUnit" representedClassName="DosageUnit" syncable="YES" codeGenerationType="class">
+        <attribute name="name" attributeType="String"/>
+    </entity>
     <entity name="Order" representedClassName="Order" syncable="YES" codeGenerationType="class">
         <attribute name="dateOrdered" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
@@ -22,7 +32,6 @@
         <relationship name="supplement" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Supplement" inverseName="storeInfos" inverseEntity="Supplement"/>
     </entity>
     <entity name="Supplement" representedClassName="Supplement" syncable="YES" codeGenerationType="class">
-        <attribute name="categories" optional="YES" attributeType="Transformable" valueTransformerName="StringSetTransformer" customClassName="NSSet"/>
         <attribute name="dosage" optional="YES" attributeType="String"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="name" optional="YES" attributeType="String"/>
@@ -30,6 +39,10 @@
         <attribute name="quantity" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="type" optional="YES" attributeType="String"/>
         <relationship name="cartItems" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CartItem" inverseName="supplement" inverseEntity="CartItem"/>
+        <relationship name="categories" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Category" inverseName="supplements" inverseEntity="Category"/>
         <relationship name="storeInfos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="StoreInfo" inverseName="supplement" inverseEntity="StoreInfo"/>
+    </entity>
+    <entity name="SupplementType" representedClassName="SupplementType" syncable="YES" codeGenerationType="class">
+        <attribute name="name" attributeType="String"/>
     </entity>
 </model>

@@ -22,6 +22,9 @@ struct ContentView: View {
     private var supplements: FetchedResults<Supplement>
 
     @State private var selectedTab = "Home"
+    
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
 
     var body: some View {
         ZStack {
@@ -86,6 +89,11 @@ struct ContentView: View {
                     HomeView()
                 }
             }
+            .alert("Error", isPresented: $showErrorAlert) {
+                Button("OK") { }
+            } message: {
+                Text(errorMessage)
+            }
         }
         .accentColor(.blue)
         .onAppear {
@@ -108,7 +116,9 @@ struct ContentView: View {
         do {
             try viewContext.save()
         } catch {
-            print("Failed to save cart: \(error)")
+            errorMessage = "Failed to save cart: \(error.localizedDescription)"
+            showErrorAlert = true
+            print(errorMessage)
         }
     }
     
@@ -190,6 +200,7 @@ struct HomeView: View {
                     .font(.system(size: 30))
                     .foregroundColor(.gray)
             }
+            
         }
     }
 }

@@ -9,24 +9,28 @@ struct EditSupplementView: View {
     @State private var isNewSupplement: Bool
     
     @State private var name: String
-    @State private var dosage: String
+    @State private var dosageAmount: String
+    @State private var dosageUnit: String
+    @State private var dosageFrequency: String
     @State private var quantity: String
     @State private var selectedType: String
-    @State private var customType: String = ""
-    @State private var showCustomTypeField: Bool = false
-    @State private var selectedCategories: Set<String> = []
-    @State private var customCategory: String = ""
-    @State private var showCustomCategoryField: Bool = false
+    @State private var selectedCategories: Set<String>
     
-    private let typeOptions = ["Capsules", "Liquid", "Tincture", "Add Custom"]
-    private let predefinedCategoryOptions = [
-        "Digestion", "Rash", "General", "Kidney", "Liver", "Stones", "Thyroid",
-        "Cramps", "Hair", "Memory", "Eyes", "Joints", "Detox", "Fungal/Yeast",
-        "Parasite", "Gall Bladder"
-    ]
-    @State private var categoryOptions: [String]
+    @FetchRequest(entity: DosageUnit.entity(), sortDescriptors: [NSSortDescriptor(keyPath: \DosageUnit.name, ascending: true)])
+    private var dosageUnits: FetchedResults<DosageUnit>
+    
+    @FetchRequest(entity: DosageFrequency.entity(), sortDescriptors: [NSSortDescriptor(keyPath: \DosageFrequency.name, ascending: true)])
+    private var dosageFrequencies: FetchedResults<DosageFrequency>
+    
+    @FetchRequest(entity: SupplementType.entity(), sortDescriptors: [NSSortDescriptor(keyPath: \SupplementType.name, ascending: true)])
+    private var supplementTypes: FetchedResults<SupplementType>
+    
+    @FetchRequest(entity: Category.entity(), sortDescriptors: [NSSortDescriptor(keyPath: \Category.name, ascending: true)])
+    private var categories: FetchedResults<Category>
     
     @State private var showingStoreSheet = false
+    @State private var showingSettingsSheet = false
+    @State private var pickerRefreshID = UUID()
     
     init(supplement: Supplement? = nil) {
         let context = PersistenceController.shared.container.viewContext
@@ -34,11 +38,18 @@ struct EditSupplementView: View {
             self.supplement = supplement
             _isNewSupplement = State(initialValue: false)
             _name = State(initialValue: supplement.name ?? "")
-            _dosage = State(initialValue: supplement.dosage ?? "")
+            
+            let dosageComponents = supplement.dosage?.split(separator: " ") ?? []
+            _dosageAmount = State(initialValue: dosageComponents.first.map(String.init) ?? "")
+            _dosageUnit = State(initialValue: dosageComponents.dropFirst().first.map(String.init) ?? "mg")
+            _dosageFrequency = State(initialValue: dosageComponents.dropFirst(2).joined(separator: " ").isEmpty ? "daily" : dosageComponents.dropFirst(2).joined(separator: " "))
+            
             _quantity = State(initialValue: String(supplement.quantity))
-            _selectedType = State(initialValue: supplement.type ?? "")
-            if let categories = supplement.categories as? Set<String> {
-                _selectedCategories = State(initialValue: categories)
+            _selectedType = State(initialValue: supplement.type ?? "Capsules")
+            if let categories = supplement.categories as? Set<Category> {
+                _selectedCategories = State(initialValue: Set(categories.map { $0.name ?? "" }))
+            } else {
+                _selectedCategories = State(initialValue: Set<String>())
             }
         } else {
             let newSupplement = Supplement(context: context)
@@ -46,12 +57,13 @@ struct EditSupplementView: View {
             self.supplement = newSupplement
             _isNewSupplement = State(initialValue: true)
             _name = State(initialValue: "")
-            _dosage = State(initialValue: "")
+            _dosageAmount = State(initialValue: "")
+            _dosageUnit = State(initialValue: "mg")
+            _dosageFrequency = State(initialValue: "daily")
             _quantity = State(initialValue: "")
             _selectedType = State(initialValue: "Capsules")
             _selectedCategories = State(initialValue: Set<String>())
         }
-        _categoryOptions = State(initialValue: predefinedCategoryOptions)
     }
 
     var body: some View {
@@ -59,92 +71,83 @@ struct EditSupplementView: View {
             Form {
                 Section(header: Text("Supplement Details")) {
                     TextField("Name", text: $name)
-                    TextField("Dosage", text: $dosage)
-                    TextField("Quantity", text: $quantity)
-                        .keyboardType(.numberPad)
                     
-                    Picker("Type", selection: $selectedType) {
-                        ForEach(typeOptions, id: \.self) { option in
-                            Text(option)
-                        }
-                        if !customType.isEmpty && !typeOptions.contains(customType) {
-                            Text(customType).tag(customType)
-                        }
-                    }
-                    .onChange(of: selectedType) { oldValue, newValue in
-                        showCustomTypeField = (newValue == "Add Custom")
-                        if !showCustomTypeField && newValue != "Add Custom" {
-                            customType = newValue
-                        }
-                    }
-                    
-                    if showCustomTypeField {
-                        TextField("Custom Type", text: $customType)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .submitLabel(.done)
-                            .onSubmit {
-                                if !customType.isEmpty {
-                                    selectedType = customType
-                                    showCustomTypeField = false
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Dosage")
+                            .font(.headline)
+                        HStack(spacing: 25) {
+                            TextField("Amount", text: $dosageAmount)
+                                .keyboardType(.decimalPad)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .frame(width: 45)
+                            Picker("Unit", selection: $dosageUnit) {
+                                ForEach(dosageUnits, id: \.self) { unit in
+                                    Text(unit.name ?? "Unknown")
+                                        .tag(unit.name ?? "Unknown")
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
                                 }
                             }
+                            .pickerStyle(MenuPickerStyle())
+                            .frame(width: 140)
+                            Picker("Frequency", selection: $dosageFrequency) {
+                                ForEach(dosageFrequencies, id: \.self) { freq in
+                                    Text(freq.name ?? "Unknown")
+                                        .tag(freq.name ?? "Unknown")
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                            }
+                            .pickerStyle(MenuPickerStyle())
+                            .frame(width: 180) // Increased width to fit "Frequency" and "weekly"
+                            .fixedSize(horizontal: true, vertical: false)
+                        }
                     }
+                    
+                    TextField("Quantity", text: $quantity)
+                        .keyboardType(.numberPad)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    
+                    Picker("Type", selection: $selectedType) {
+                        ForEach(supplementTypes, id: \.self) { type in
+                            Text(type.name ?? "Unknown")
+                                .tag(type.name ?? "Unknown")
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
                     
                     VStack(alignment: .leading) {
                         Text("Categories")
                             .font(.headline)
                         ScrollView {
-                            ForEach(categoryOptions, id: \.self) { category in
+                            ForEach(categories, id: \.self) { category in
                                 HStack {
-                                    Image(systemName: selectedCategories.contains(category) ? "checkmark.square" : "square")
+                                    Image(systemName: selectedCategories.contains(category.name ?? "") ? "checkmark.square" : "square")
                                         .foregroundColor(.blue)
-                                    Text(category)
+                                    Text(category.name ?? "Unknown")
                                     Spacer()
                                 }
                                 .contentShape(Rectangle())
                                 .onTapGesture {
-                                    if selectedCategories.contains(category) {
-                                        selectedCategories.remove(category)
+                                    if selectedCategories.contains(category.name ?? "") {
+                                        selectedCategories.remove(category.name ?? "")
                                     } else {
-                                        selectedCategories.insert(category)
+                                        selectedCategories.insert(category.name ?? "")
                                     }
+                                    pickerRefreshID = UUID()
                                 }
                             }
                         }
                         .frame(maxHeight: 200)
-                        
-                        HStack {
-                            Button(action: {
-                                showCustomCategoryField.toggle()
-                            }) {
-                                Text(showCustomCategoryField ? "Cancel" : "Add Custom Category")
-                            }
-                            Spacer()
-                        }
-                        
-                        if showCustomCategoryField {
-                            TextField("Custom Category", text: $customCategory)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .submitLabel(.done)
-                                .onSubmit {
-                                    if !customCategory.isEmpty && !categoryOptions.contains(customCategory) {
-                                        categoryOptions.append(customCategory)
-                                        selectedCategories.insert(customCategory)
-                                        customCategory = ""
-                                        showCustomCategoryField = false
-                                    }
-                                }
-                        }
-                        
-                        Text("Selected: \(selectedCategories.sorted().joined(separator: ", "))")
-                            .font(.caption)
-                            .foregroundColor(.gray)
                     }
                 }
                 
                 Section {
                     Button("Edit Stores") {
                         showingStoreSheet = true
+                    }
+                    Button("Manage Options") {
+                        showingSettingsSheet = true
                     }
                 }
             }
@@ -155,34 +158,43 @@ struct EditSupplementView: View {
                         saveSupplement()
                         dismiss()
                     }
-                    .disabled(name.isEmpty)
+                    .disabled(name.isEmpty || dosageAmount.isEmpty)
                 }
             }
             .sheet(isPresented: $showingStoreSheet) {
                 SupplementStoreView(supplement: supplement)
             }
-            .onDisappear {
-                if isNewSupplement && !viewContext.hasChanges {
-                    viewContext.delete(supplement)
-                }
+            .sheet(isPresented: $showingSettingsSheet) {
+                SettingsView()
+            }
+            .id(pickerRefreshID)
+            .onAppear {
+                print("Dosage Units available: \(dosageUnits.map { $0.name ?? "nil" })")
+                print("Dosage Frequencies available: \(dosageFrequencies.map { $0.name ?? "nil" })")
+                print("Supplement Types available: \(supplementTypes.map { $0.name ?? "nil" })")
             }
         }
     }
     
     private func saveSupplement() {
         supplement.name = name
-        supplement.dosage = dosage
-        supplement.quantity = Int32(quantity) ?? 0
+        supplement.dosage = "\(dosageAmount) \(dosageUnit) \(dosageFrequency)".trimmingCharacters(in: .whitespaces)
+        supplement.quantity = Int32(quantity) ?? 0 // Ensure quantity updates
         supplement.type = selectedType
-        supplement.categories = NSSet(set: selectedCategories)
+        supplement.categories = NSSet(array: categories.filter { selectedCategories.contains($0.name ?? "") })
         
-        try? viewContext.save()
+        do {
+            try viewContext.save()
+            print("Saved supplement with dosage: \(supplement.dosage ?? "N/A"), quantity: \(supplement.quantity)")
+        } catch {
+            print("Failed to save supplement: \(error)")
+        }
     }
 }
 
 struct EditSupplementView_Previews: PreviewProvider {
     static var previews: some View {
         EditSupplementView()
-            .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
     }
 }
